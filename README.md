@@ -2,6 +2,8 @@
 
 A deliberately simple, offline-capable web app for tracking daily calorie intake.
 
+[https://tabascoterrier.github.io/calorie-counter/](https://tabascoterrier.github.io/calorie-counter/)
+
 - Log food items with calorie counts for each meal
 - Daily total with per-meal breakdown
 - Weekly overview bar chart (last 7 days)
