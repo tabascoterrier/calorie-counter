@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calorie Counter</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#FF6B35">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Calories">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <style>
+    body { background-color: #f8f9fa; }
+    .meal-card { transition: box-shadow 0.2s; }
+    .meal-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .total-display { font-size: 3rem; font-weight: 700; line-height: 1; }
+    .entry-row:hover { background-color: #f8f9fa; }
+    #weekChart { max-height: 260px; }
+  </style>
+</head>
+<body>
+
+<div class="container py-4">
+  <h1 class="mb-1 fw-bold">Calorie Counter</h1>
+  <p id="currentDate" class="text-muted mb-4"></p>
+
+  <!-- Daily Total -->
+  <div class="card mb-4 border-0 shadow-sm">
+    <div class="card-body text-center py-4">
+      <div class="text-muted mb-1">Today's Total</div>
+      <div class="total-display text-primary" id="totalCalories">0</div>
+      <div class="text-muted">calories</div>
+      <div class="mt-3">
+        <span class="badge bg-secondary me-1" id="breakfastBadge">Breakfast: 0</span>
+        <span class="badge bg-secondary me-1" id="lunchBadge">Lunch: 0</span>
+        <span class="badge bg-secondary" id="dinnerBadge">Dinner: 0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Meal Cards -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card h-100 border-0 shadow-sm meal-card">
+        <div class="card-header bg-warning bg-opacity-25 fw-semibold">
+          🌅 Breakfast
+        </div>
+        <div class="card-body">
+          <ul class="list-unstyled mb-3" id="breakfastList"><li class="text-muted small">No entries yet</li></ul>
+          <button class="btn btn-warning btn-sm w-100" onclick="openAddModal('breakfast')">+ Add Item</button>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100 border-0 shadow-sm meal-card">
+        <div class="card-header bg-success bg-opacity-25 fw-semibold">
+          ☀️ Lunch
+        </div>
+        <div class="card-body">
+          <ul class="list-unstyled mb-3" id="lunchList"><li class="text-muted small">No entries yet</li></ul>
+          <button class="btn btn-success btn-sm w-100" onclick="openAddModal('lunch')">+ Add Item</button>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100 border-0 shadow-sm meal-card">
+        <div class="card-header bg-primary bg-opacity-25 fw-semibold">
+          🌙 Dinner
+        </div>
+        <div class="card-body">
+          <ul class="list-unstyled mb-3" id="dinnerList"><li class="text-muted small">No entries yet</li></ul>
+          <button class="btn btn-primary btn-sm w-100" onclick="openAddModal('dinner')">+ Add Item</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Weekly Chart -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header fw-semibold">Weekly Overview</div>
+    <div class="card-body">
+      <canvas id="weekChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Reset today -->
+  <div class="text-end">
+    <button class="btn btn-outline-danger btn-sm" onclick="confirmReset()">Reset Today</button>
+  </div>
+</div>
+
+<!-- Add Item Modal -->
+<div class="modal fade" id="addModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addModalTitle">Add Item</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <!-- Saved foods -->
+        <div id="savedFoodsSection" class="mb-3 d-none">
+          <label class="form-label small text-muted mb-1">Saved foods</label>
+          <div id="savedFoodsList" class="d-flex flex-wrap gap-1"></div>
+          <hr class="mt-2 mb-0">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Food / Description <span class="text-muted small">(optional)</span></label>
+          <input type="text" class="form-control" id="itemName" placeholder="e.g. Oatmeal">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Calories</label>
+          <input type="number" class="form-control" id="itemCalories" placeholder="e.g. 300" min="1">
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="rememberFood">
+          <label class="form-check-label small" for="rememberFood">Remember this food</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="addItem()">Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  const STORAGE_KEY = 'calorieData';
+  const SAVED_FOODS_KEY = 'savedFoods';
+  const MAX_DAYS = 7;
+  let currentMeal = null;
+  let addModal = null;
+  let weekChart = null;
+
+  // --- Saved foods helpers ---
+
+  function loadSavedFoods() {
+    try {
+      return JSON.parse(localStorage.getItem(SAVED_FOODS_KEY)) || { breakfast: [], lunch: [], dinner: [] };
+    } catch { return { breakfast: [], lunch: [], dinner: [] }; }
+  }
+
+  function saveSavedFoods(saved) {
+    localStorage.setItem(SAVED_FOODS_KEY, JSON.stringify(saved));
+  }
+
+  function rememberFood(meal, name, calories) {
+    const saved = loadSavedFoods();
+    const list = saved[meal];
+    // Deduplicate by name (case-insensitive); update calories if already exists
+    const existing = list.findIndex(f => f.name.toLowerCase() === name.toLowerCase());
+    if (existing >= 0) {
+      list[existing].calories = calories;
+    } else {
+      list.push({ name, calories });
+    }
+    saveSavedFoods(saved);
+  }
+
+  function forgetFood(meal, index) {
+    const saved = loadSavedFoods();
+    saved[meal].splice(index, 1);
+    saveSavedFoods(saved);
+    renderSavedFoods(meal);
+  }
+
+  function renderSavedFoods(meal) {
+    const saved = loadSavedFoods();
+    const list = saved[meal];
+    const section = document.getElementById('savedFoodsSection');
+    const container = document.getElementById('savedFoodsList');
+    if (list.length === 0) {
+      section.classList.add('d-none');
+      return;
+    }
+    section.classList.remove('d-none');
+    container.innerHTML = list.map((f, i) => `
+      <span class="badge rounded-pill bg-light text-dark border d-inline-flex align-items-center gap-1 px-2 py-1" style="font-size:.8rem">
+        <span class="saved-food-pick" role="button" onclick="pickSavedFood(${i})" style="cursor:pointer">
+          ${escapeHtml(f.name)} <span class="text-muted">(${f.calories})</span>
+        </span>
+        <button class="btn-close btn-close-sm p-0 ms-1" style="font-size:.55rem" onclick="forgetFood('${meal}', ${i})" title="Forget"></button>
+      </span>`).join('');
+  }
+
+  function pickSavedFood(index) {
+    const saved = loadSavedFoods();
+    const food = saved[currentMeal][index];
+    document.getElementById('itemName').value = food.name;
+    document.getElementById('itemCalories').value = food.calories;
+  }
+
+  // --- Data helpers ---
+
+  function todayKey() {
+    return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  }
+
+  function loadData() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+    } catch { return {}; }
+  }
+
+  function saveData(data) {
+    // Prune to last MAX_DAYS days
+    const keys = Object.keys(data).sort();
+    while (keys.length > MAX_DAYS) {
+      delete data[keys.shift()];
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  }
+
+  function getTodayRecord() {
+    const data = loadData();
+    const key = todayKey();
+    if (!data[key]) {
+      data[key] = { breakfast: [], lunch: [], dinner: [] };
+    }
+    return { data, key };
+  }
+
+  function mealTotal(entries) {
+    return entries.reduce((sum, e) => sum + e.calories, 0);
+  }
+
+  // --- UI rendering ---
+
+  function render() {
+    const { data, key } = getTodayRecord();
+    const today = data[key];
+
+    const meals = ['breakfast', 'lunch', 'dinner'];
+    const colors = { breakfast: 'warning', lunch: 'success', dinner: 'primary' };
+    let grandTotal = 0;
+
+    meals.forEach(meal => {
+      const entries = today[meal];
+      const total = mealTotal(entries);
+      grandTotal += total;
+
+      // Update badge
+      const label = meal.charAt(0).toUpperCase() + meal.slice(1);
+      document.getElementById(`${meal}Badge`).textContent = `${label}: ${total}`;
+
+      // Update list
+      const list = document.getElementById(`${meal}List`);
+      if (entries.length === 0) {
+        list.innerHTML = '<li class="text-muted small">No entries yet</li>';
+      } else {
+        list.innerHTML = entries.map((e, i) => `
+          <li class="d-flex justify-content-between align-items-center entry-row px-1 rounded mb-1">
+            <span class="small">${escapeHtml(e.name)}</span>
+            <span class="d-flex align-items-center gap-2">
+              <span class="badge bg-${colors[meal]}-subtle text-${colors[meal]}-emphasis">${e.calories} kcal</span>
+              <button class="btn btn-link btn-sm text-danger p-0 lh-1" onclick="removeItem('${meal}', ${i})" title="Remove">&times;</button>
+            </span>
+          </li>`).join('');
+      }
+    });
+
+    document.getElementById('totalCalories').textContent = grandTotal.toLocaleString();
+    renderChart(data);
+  }
+
+  function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.appendChild(document.createTextNode(str));
+    return d.innerHTML;
+  }
+
+  function renderChart(data) {
+    const sortedKeys = Object.keys(data).sort().slice(-MAX_DAYS);
+    const labels = sortedKeys.map(k => {
+      const d = new Date(k + 'T00:00:00');
+      return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    });
+    const totals = sortedKeys.map(k => {
+      const day = data[k];
+      return mealTotal(day.breakfast) + mealTotal(day.lunch) + mealTotal(day.dinner);
+    });
+
+    const breakfastTotals = sortedKeys.map(k => mealTotal(data[k].breakfast));
+    const lunchTotals    = sortedKeys.map(k => mealTotal(data[k].lunch));
+    const dinnerTotals   = sortedKeys.map(k => mealTotal(data[k].dinner));
+
+    const ctx = document.getElementById('weekChart').getContext('2d');
+    if (weekChart) weekChart.destroy();
+
+    weekChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Breakfast', data: breakfastTotals, backgroundColor: 'rgba(255, 193, 7, 0.8)', borderRadius: 4 },
+          { label: 'Lunch',     data: lunchTotals,    backgroundColor: 'rgba(25, 135, 84, 0.8)',  borderRadius: 4 },
+          { label: 'Dinner',    data: dinnerTotals,   backgroundColor: 'rgba(13, 110, 253, 0.8)', borderRadius: 4 },
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              footer: (items) => {
+                const total = items.reduce((s, i) => s + i.parsed.y, 0);
+                return `Total: ${total} kcal`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: { stacked: true, grid: { display: false } },
+          y: { stacked: true, beginAtZero: true, ticks: { callback: v => v + ' kcal' } }
+        }
+      }
+    });
+  }
+
+  // --- Actions ---
+
+  function openAddModal(meal) {
+    currentMeal = meal;
+    const label = meal.charAt(0).toUpperCase() + meal.slice(1);
+    document.getElementById('addModalTitle').textContent = `Add to ${label}`;
+    document.getElementById('itemName').value = '';
+    document.getElementById('itemCalories').value = '';
+    document.getElementById('rememberFood').checked = false;
+    renderSavedFoods(meal);
+    addModal.show();
+    setTimeout(() => document.getElementById('itemName').focus(), 300);
+  }
+
+  function addItem() {
+    const name = document.getElementById('itemName').value.trim();
+    const calories = parseInt(document.getElementById('itemCalories').value, 10);
+    if (!calories || calories < 1) { document.getElementById('itemCalories').focus(); return; }
+
+    if (name && document.getElementById('rememberFood').checked) {
+      rememberFood(currentMeal, name, calories);
+    }
+
+    const { data, key } = getTodayRecord();
+    data[key][currentMeal].push({ name, calories });
+    saveData(data);
+    addModal.hide();
+    render();
+  }
+
+  function removeItem(meal, index) {
+    const { data, key } = getTodayRecord();
+    data[key][meal].splice(index, 1);
+    saveData(data);
+    render();
+  }
+
+  function confirmReset() {
+    if (!confirm('Clear all entries for today?')) return;
+    const data = loadData();
+    const key = todayKey();
+    data[key] = { breakfast: [], lunch: [], dinner: [] };
+    saveData(data);
+    render();
+  }
+
+  // --- Init ---
+
+  document.getElementById('currentDate').textContent = new Date().toLocaleDateString(undefined, {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  });
+
+  // Allow Enter key in modal inputs
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && addModal && document.getElementById('addModal').classList.contains('show')) {
+      addItem();
+    }
+  });
+
+  addModal = new bootstrap.Modal(document.getElementById('addModal'));
+  render();
+
+  // Generate apple-touch-icon via canvas (iOS requires PNG, not SVG)
+  (function () {
+    const S = 180;
+    const c = document.createElement('canvas');
+    c.width = c.height = S;
+    const ctx = c.getContext('2d');
+
+    // Rounded-square background with orange gradient
+    const grad = ctx.createLinearGradient(0, 0, S, S);
+    grad.addColorStop(0, '#FF6B35');
+    grad.addColorStop(1, '#F7931E');
+    const r = S * 0.225;
+    ctx.beginPath();
+    ctx.moveTo(r, 0); ctx.lineTo(S - r, 0); ctx.quadraticCurveTo(S, 0, S, r);
+    ctx.lineTo(S, S - r); ctx.quadraticCurveTo(S, S, S - r, S);
+    ctx.lineTo(r, S); ctx.quadraticCurveTo(0, S, 0, S - r);
+    ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Bootstrap fire icon path (designed on 16×16 grid)
+    const scale = S / 16 * 0.65;
+    const off = (S - 16 * scale) / 2;
+    ctx.save();
+    ctx.translate(off, off);
+    ctx.scale(scale, scale);
+    ctx.fillStyle = 'white';
+    const flame = new Path2D('M8 16c3.314 0 6-2 6-5.5 0-1.5-.5-4-2.5-6 .25 1.5-1.25 2-1.25 2C11 4 9 .5 6 0c.357 2 .5 4-2 6-1.25 1-2 2.729-2 4.5C2 14 4.686 16 8 16m0-1c-1.657 0-3-1-3-2.75 0-.75.25-2 1.25-3C6.125 10 7 10.5 7 10.5c-.375-1.25.5-3.25 2-3.5-.179 1-.25 2 1 3 .625.5 1 1.364 1 2.25C11 14 9.657 15 8 15');
+    ctx.fill(flame);
+    ctx.restore();
+
+    const link = document.createElement('link');
+    link.rel = 'apple-touch-icon';
+    link.href = c.toDataURL('image/png');
+    document.head.appendChild(link);
+  })();
+</script>
+</body>
+</html>
