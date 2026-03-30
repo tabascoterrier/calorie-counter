@@ -385,6 +385,10 @@
   addModal = new bootstrap.Modal(document.getElementById('addModal'));
   render();
 
+  if (navigator.storage && navigator.storage.persist) {
+    navigator.storage.persist();
+  }
+
   // Generate apple-touch-icon via canvas (iOS requires PNG, not SVG)
   (function () {
     const S = 180;
