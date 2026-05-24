@@ -86,8 +86,13 @@
     </div>
   </div>
 
-  <!-- Reset today -->
-  <div class="text-end">
+  <!-- Reset today / Import-Export -->
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary btn-sm" onclick="exportSavedFoods()">Export saved foods</button>
+      <button class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('importFileInput').click()">Import saved foods</button>
+      <input type="file" id="importFileInput" accept=".json,application/json" class="d-none" onchange="importSavedFoods(this)">
+    </div>
     <button class="btn btn-outline-danger btn-sm" onclick="confirmReset()">Reset Today</button>
   </div>
 </div>
@@ -367,6 +372,46 @@
     data[key] = { breakfast: [], lunch: [], dinner: [] };
     saveData(data);
     render();
+  }
+
+  // --- Import / Export ---
+
+  function exportSavedFoods() {
+    const saved = loadSavedFoods();
+    const blob = new Blob([JSON.stringify(saved, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'saved-foods.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importSavedFoods(input) {
+    const file = input.files[0];
+    if (!file) return;
+    input.value = '';
+    const reader = new FileReader();
+    reader.onload = e => {
+      let parsed;
+      try {
+        parsed = JSON.parse(e.target.result);
+      } catch {
+        alert('Invalid file — could not parse JSON.');
+        return;
+      }
+      if (!parsed || typeof parsed !== 'object' ||
+          !Array.isArray(parsed.breakfast) ||
+          !Array.isArray(parsed.lunch) ||
+          !Array.isArray(parsed.dinner)) {
+        alert('Invalid file — expected saved foods with breakfast, lunch, and dinner arrays.');
+        return;
+      }
+      const total = parsed.breakfast.length + parsed.lunch.length + parsed.dinner.length;
+      if (!confirm(`Import ${total} saved food(s)? This will replace your current saved foods.`)) return;
+      saveSavedFoods(parsed);
+    };
+    reader.readAsText(file);
   }
 
   // --- Init ---
