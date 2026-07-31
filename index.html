@@ -31,13 +31,17 @@
   <div class="card mb-4 border-0 shadow-sm">
     <div class="card-body text-center py-4">
       <div class="text-muted mb-1">Today's Total</div>
-      <div class="total-display text-primary" id="totalCalories">0</div>
+      <div class="total-display text-primary">
+        <span id="totalCalories">0</span><span class="text-muted"> / </span><span id="budgetDisplay">2000</span>
+        <button type="button" class="btn btn-link btn-sm align-middle p-0 ms-1" style="font-size:1rem; text-decoration:none" onclick="openBudgetModal()" title="Edit daily budget">✏️</button>
+      </div>
       <div class="text-muted">calories</div>
       <div class="mt-3">
         <span class="badge bg-secondary me-1" id="breakfastBadge">Breakfast: 0</span>
         <span class="badge bg-secondary me-1" id="lunchBadge">Lunch: 0</span>
         <span class="badge bg-secondary" id="dinnerBadge">Dinner: 0</span>
       </div>
+      <div class="small text-muted mt-2">Remaining: <span id="remainingCalories">0</span> calories</div>
     </div>
   </div>
 
@@ -133,14 +137,64 @@
   </div>
 </div>
 
+<!-- Edit Budget Modal -->
+<div class="modal fade" id="budgetModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Daily Budget</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Daily Calorie Budget</label>
+          <input type="number" class="form-control" id="budgetInput" placeholder="e.g. 2000" min="1">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="saveBudgetFromModal()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   const STORAGE_KEY = 'calorieData';
   const SAVED_FOODS_KEY = 'savedFoods';
+  const BUDGET_KEY = 'calorieBudget';
+  const DEFAULT_BUDGET = 2000;
   const MAX_DAYS = 7;
   let currentMeal = null;
   let addModal = null;
+  let budgetModal = null;
   let weekChart = null;
+
+  // --- Budget helpers ---
+
+  function loadBudget() {
+    const v = parseInt(localStorage.getItem(BUDGET_KEY), 10);
+    return (v && v > 0) ? v : DEFAULT_BUDGET;
+  }
+
+  function saveBudget(value) {
+    localStorage.setItem(BUDGET_KEY, String(value));
+  }
+
+  function openBudgetModal() {
+    document.getElementById('budgetInput').value = loadBudget();
+    budgetModal.show();
+    setTimeout(() => document.getElementById('budgetInput').focus(), 300);
+  }
+
+  function saveBudgetFromModal() {
+    const value = parseInt(document.getElementById('budgetInput').value, 10);
+    if (!value || value < 1) { document.getElementById('budgetInput').focus(); return; }
+    saveBudget(value);
+    budgetModal.hide();
+    render();
+  }
 
   // --- Saved foods helpers ---
 
@@ -270,6 +324,16 @@
     });
 
     document.getElementById('totalCalories').textContent = grandTotal.toLocaleString();
+
+    const budget = loadBudget();
+    document.getElementById('budgetDisplay').textContent = budget.toLocaleString();
+
+    const remaining = budget - grandTotal;
+    const remainingEl = document.getElementById('remainingCalories');
+    remainingEl.textContent = remaining.toLocaleString();
+    remainingEl.classList.toggle('text-danger', remaining < 0);
+    remainingEl.classList.toggle('text-success', remaining >= 0);
+
     renderChart(data);
   }
 
@@ -422,12 +486,16 @@
 
   // Allow Enter key in modal inputs
   document.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && addModal && document.getElementById('addModal').classList.contains('show')) {
+    if (e.key !== 'Enter') return;
+    if (addModal && document.getElementById('addModal').classList.contains('show')) {
       addItem();
+    } else if (budgetModal && document.getElementById('budgetModal').classList.contains('show')) {
+      saveBudgetFromModal();
     }
   });
 
   addModal = new bootstrap.Modal(document.getElementById('addModal'));
+  budgetModal = new bootstrap.Modal(document.getElementById('budgetModal'));
   render();
 
   if (navigator.storage && navigator.storage.persist) {
